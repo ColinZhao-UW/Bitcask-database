@@ -31,7 +31,8 @@ type DataFile struct {
 // 4 	1	5		5 = 15
 const maxLogRecordHeaderSize = binary.MaxVarintLen32*2 + 5
 
-// 打开新的数据文件
+// 打开新的数据文件，返回一个对应的dataFile文件
+// 获取这个file的name
 func OpenDataFile(dirPath string, fileId uint32, ioType fio.FileIOType) (*DataFile, error) {
 	fileName := GetDataFileName(dirPath, fileId)
 	return newDataFile(fileName, fileId, ioType)
@@ -45,6 +46,7 @@ func OpenHintFile(dirPath string) (*DataFile, error) {
 
 // OpenMergeFinishedFile 打开标识 merge 完成的文件
 func OpenMergeFinishedFile(dirPath string) (*DataFile, error) {
+	//需要传入路径+文件名
 	fileName := filepath.Join(dirPath, MergeFinishedFileName)
 	return newDataFile(fileName, 0, fio.StandardFIO)
 }
@@ -55,6 +57,7 @@ func OpenSeqNoFile(dirPath string) (*DataFile, error) {
 	return newDataFile(fileName, 0, fio.StandardFIO)
 }
 func newDataFile(fileName string, fileId uint32, ioType fio.FileIOType) (*DataFile, error) {
+	//
 	ioManager, err := fio.NewIOManager(fileName, ioType)
 	if err != nil {
 		return nil, err
@@ -85,6 +88,7 @@ func (df *DataFile) WriteHintRecord(key []byte, pos *LogRecordPos) error {
 }
 
 func GetDataFileName(dirPath string, fileId uint32) string {
+	//fmt.Sprintf("%09d"，filedId)，将fileId变成一个九位数，使用0去补全一个数
 	return filepath.Join(dirPath, fmt.Sprintf("%09d", fileId)+DataFileNameSuffix)
 }
 
@@ -96,6 +100,7 @@ func (df *DataFile) Close() error {
 }
 
 // 根据offset，从数据文件读取LogRecord
+// 将位置信息转化为对应的LogRecord对象
 func (df *DataFile) ReadLogRecord(offset int64) (*LogRecord, int64, error) {
 	fileSize, err := df.IoManager.Size()
 	if err != nil {
@@ -107,13 +112,16 @@ func (df *DataFile) ReadLogRecord(offset int64) (*LogRecord, int64, error) {
 	if offset+maxLogRecordHeaderSize > fileSize {
 		headerBytes = fileSize - offset
 	}
-	//读取头
+	// 读取头，headerBytes表示需要读取多长的内容
+	// 返回值是一个byte类型数组，命名为headerBuf
 	headerBuf, err := df.readNBytes(headerBytes, offset)
 	if err != nil {
 		return nil, 0, err
 	}
+	// 解码headerBuf中的内容,即前headerBytes的内容，返回一个LogRecordHeader对象和整个header的大小
+	// 将byte[]信息转化为一个实际的header对象
 	header, headerSize := decodeLogRecordHeader(headerBuf)
-	//下面的两个条件表示读区到了文件末尾，直接返回eof错误
+	// 下面的两个条件表示读区到了文件末尾，直接返回eof错误
 	if header == nil {
 		return nil, 0, io.EOF
 	}
@@ -121,24 +129,24 @@ func (df *DataFile) ReadLogRecord(offset int64) (*LogRecord, int64, error) {
 		return nil, 0, io.EOF
 	}
 
-	//读完头后，从头里取出对应key和value长度
-
+	// 读完头后，从头里取出对应key和value长度
 	keySize, valueSize := int64(header.keySize), int64(header.valueSize)
 	var recordSize = headerSize + keySize + valueSize
 
 	logRecord := &LogRecord{Type: header.recordType}
 
-	//开始读取用户实际存储的key/value数据
+	// 开始读取用户实际存储的key/value数据
 	if keySize > 0 || valueSize > 0 {
+		// 从 offset + headerSize这个位置开始进行读取 keySize + valueSize这么大的数据
 		kvBuf, err := df.readNBytes(keySize+valueSize, offset+headerSize)
 		if err != nil {
 			return nil, 0, err
 		}
-		//取出value和size
+		// 取出value和size
 		logRecord.Key = kvBuf[:keySize]
 		logRecord.Value = kvBuf[keySize:]
 	}
-	//根据取出来的数据进行crc计算，观察和header里的crc是否相同
+	// 根据取出来的数据进行crc计算，观察和header里的crc是否相同
 	crc := getLogRecordCrc(logRecord, headerBuf[crc32.Size:headerSize])
 	if crc != header.crc {
 		return nil, 0, ErrInvalidCRC

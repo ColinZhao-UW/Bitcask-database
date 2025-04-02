@@ -13,11 +13,12 @@ const (
 	LogRecordTxnFinished
 )
 
+// 头的定义
 type LogRecordHeader struct {
-	crc        uint32 // 检查值
-	recordType LogRecordType
-	keySize    uint32
-	valueSize  uint32
+	crc        uint32        // 校验值
+	recordType LogRecordType //记录类型
+	keySize    uint32        // key的大小
+	valueSize  uint32        // value的大小
 }
 
 // 索引结构体
@@ -74,22 +75,22 @@ func decodeLogRecordHeader(buf []byte) (*LogRecordHeader, int64) {
 	if len(buf) <= 4 {
 		return nil, 0
 	}
+	//取出这个byte数组中的前五位，分别是crc校验和type
 	header := &LogRecordHeader{
 		crc:        binary.LittleEndian.Uint32(buf[:4]),
 		recordType: buf[4],
 	}
 
 	var index = 5
-	//取出实例的key，size
+	//取出buf中的keySize
 	keySize, n := binary.Varint(buf[index:])
 	header.keySize = uint32(keySize)
 	index += n
 
-	//取出实际的value size
+	//取出实际的valueSize
 	valueSize, n := binary.Varint(buf[index:])
 	header.valueSize = uint32(valueSize)
 	index += n
-
 	return header, int64(index)
 }
 
@@ -110,7 +111,7 @@ func EncodeLogRecordPos(pos *LogRecordPos) []byte {
 	buf := make([]byte, binary.MaxVarintLen32+binary.MaxVarintLen64)
 	var index = 0
 	index += binary.PutVarint(buf[index:], int64(pos.Fid))
-	index += binary.PutVarint(buf[index:], int64(pos.Offset))
+	index += binary.PutVarint(buf[index:], pos.Offset)
 	return buf[:index]
 }
 

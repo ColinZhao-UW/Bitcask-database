@@ -22,7 +22,6 @@ type DB struct {
 	fileIds    []int //文件id，只用于加载索引的时候使用，不能用于其他地方的更新和使用
 	seqNo      uint64
 	isMerging  bool //db是否在进行mer操作
-
 }
 
 func checkOptions(options Options) error {
@@ -138,59 +137,63 @@ func (db *DB) appendLogRecordWithLock(logRecord *data.LogRecord) (*data.LogRecor
 
 // 追加写记录到活跃文件中， p5
 func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, error) {
-	//判断当前活跃数据文件是否存在
-	//如果为空则初始化数据
+	// 判断当前活跃数据文件是否存在
+	// 如果为空则初始化数据
 	if db.activeFile == nil {
 		if err := db.setActiveDataFile(); err != nil {
 			return nil, err
 		}
 	}
 
-	//需要有一个编码方法
-	//写入数据编码
+	// 存入文件的是要被编码后的数据，调用encodeLogRecord对数据进行编码
+	// 将数据插入到对应文件中，同时保证了如果当前文件写不下，会开启新的文件写入，保证数据一定会成功写入到一个文件中
 	encRecord, size := data.EncodeLogRecord(logRecord)
-	//如果写入的数据已经达到了活跃文件的阈值，则关闭活跃文件，并打开新的文件
+	// 如果写入的数据已经达到了活跃文件的阈值，则关闭活跃文件，并打开新的文件
 	if db.activeFile.WriteOff+size > db.options.DataFileSize {
 		//先持久化数据文件，保证以后的数据持久到磁盘中
 		if err := db.activeFile.Sync(); err != nil {
 			return nil, err
 		}
 
-		//将当前的活跃文件转化为旧的文件
+		// 将当前的活跃文件转化为旧的文件
 		db.olderFiles[db.activeFile.FileId] = db.activeFile
 
-		//打开新的数据文件
+		// 打开新的数据文件
 		if err := db.setActiveDataFile(); err != nil {
 			return nil, err
 		}
 	}
 
-	//在索引中的writeOff是写入之前的，这样可以读到起始位置，
-	//再读size个字符就表示将这个数据读完了
+	// 在索引中的writeOff保留的是这条记录的起始地址，这样可以读到起始位置，
+	// 这个writeOff需要记录到索引信息中
 	writeOff := db.activeFile.WriteOff
 	if err := db.activeFile.Write(encRecord); err != nil {
 		return nil, err
 	}
 
-	//判断是否需要对数据进行持久化
+	// 判断是否需要对数据进行立刻的持久化
 	if db.options.SyncWrites {
 		if err := db.activeFile.Sync(); err != nil {
 			return nil, err
 		}
 	}
 
-	//构造pos数据返回给put方法，写入内存
+	// 构造pos数据返回给put方法，写入内存
 	pos := &data.LogRecordPos{Fid: db.activeFile.FileId, Offset: writeOff}
 	return pos, nil
 }
 
 // 设置当前活跃文件
 // 在访问此方法前必须持有互斥锁
+// 该方法在以下几种情况会被调用：
+// 1.文件被写满。2.数据库启动时为空
 func (db *DB) setActiveDataFile() error {
 	var initialFileId uint32 = 0
 	if db.activeFile != nil {
 		initialFileId = db.activeFile.FileId + 1
 	}
+	//打开一个文件，即获取到一个dataFile对象
+	//调用dataFile对象即可操作这个具体的文件
 	dataFile, err := data.OpenDataFile(db.options.DirPath, initialFileId, db.options.IOType)
 	if err != nil {
 		return err
@@ -368,7 +371,7 @@ func (db *DB) Delete(key []byte) error {
 }
 
 func (db *DB) getValueByPosition(logRecordPos *data.LogRecordPos) ([]byte, error) {
-	//根据文件id找到对应的数据文件
+	//根据文件id获取对应的dataFile对象
 	var dataFile *data.DataFile
 	if db.activeFile.FileId == logRecordPos.Fid {
 		dataFile = db.activeFile
@@ -385,7 +388,7 @@ func (db *DB) getValueByPosition(logRecordPos *data.LogRecordPos) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	//判断这条记录是不是被删除的
+	//判断这条记录是不是delete类型，如果是，表示这条记录是被删除的，需要返回空
 	if logRecord.Type == data.LogRecordDeleted {
 		return nil, ErrDataFileNotFound
 	}
