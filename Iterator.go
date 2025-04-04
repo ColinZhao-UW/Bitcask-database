@@ -61,6 +61,8 @@ func (it *Iterator) Close() {
 	it.indexIter.Close()
 }
 
+// 跳到下一个指定前缀的数据
+// 比如配置的制定前缀为[]byte("b")，那么就会跳过索引的apple
 func (it *Iterator) skipToNext() {
 	prefixLen := len(it.options.Prefix)
 	if prefixLen == 0 {

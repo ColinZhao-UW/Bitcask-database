@@ -112,6 +112,7 @@ func EncodeLogRecordPos(pos *LogRecordPos) []byte {
 	var index = 0
 	index += binary.PutVarint(buf[index:], int64(pos.Fid))
 	index += binary.PutVarint(buf[index:], pos.Offset)
+	index += binary.PutVarint(buf[index:], int64(pos.Size))
 	return buf[:index]
 }
 
@@ -121,9 +122,12 @@ func DecodeLogRecordPos(buf []byte) *LogRecordPos {
 	filedId, n := binary.Varint(buf[index:])
 	index += n
 	offset, n := binary.Varint(buf[index:])
+	index += n
+	size, _ := binary.Varint(buf[index:])
 	return &LogRecordPos{
 		Fid:    uint32(filedId),
 		Offset: offset,
+		Size:   uint32(size),
 	}
 }
 

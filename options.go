@@ -4,11 +4,13 @@ import "os"
 
 // 配置项
 type Options struct {
-	DirPath      string //数据库数据目录
-	DataFileSize int64  //数据文件大小
-	SyncWrites   bool   //每次写入是否需要持久化
-	IndexType    IndexType
-	IOType       FileIOType
+	DirPath            string //数据库数据目录
+	DataFileSize       int64  //数据文件大小
+	SyncWrites         bool   //每次写入是否需要持久化
+	IndexType          IndexType
+	BytesPerSync       uint
+	MMapAtStartUp      bool
+	DataFileMergeRatio float32
 }
 
 type IndexType = int8
@@ -29,10 +31,13 @@ const (
 )
 
 var DefaultOptions = Options{
-	DirPath:      os.TempDir(),
-	DataFileSize: 256 * 1024 * 1024,
-	SyncWrites:   false,
-	IndexType:    Btree,
+	DirPath:            os.TempDir(),
+	DataFileSize:       256 * 1024 * 1024,
+	SyncWrites:         false,
+	IndexType:          Btree,
+	BytesPerSync:       0,
+	MMapAtStartUp:      true,
+	DataFileMergeRatio: 0.5,
 }
 
 type IteratorOptions struct {

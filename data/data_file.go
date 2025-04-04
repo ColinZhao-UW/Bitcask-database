@@ -33,6 +33,8 @@ const maxLogRecordHeaderSize = binary.MaxVarintLen32*2 + 5
 
 // 打开新的数据文件，返回一个对应的dataFile文件
 // 获取这个file的name
+// 除了openDataFile之外，其他都是使用标准io。
+// 只有在最开始读数据的时候会用上mmap
 func OpenDataFile(dirPath string, fileId uint32, ioType fio.FileIOType) (*DataFile, error) {
 	fileName := GetDataFileName(dirPath, fileId)
 	return newDataFile(fileName, fileId, ioType)
@@ -157,5 +159,18 @@ func (df *DataFile) ReadLogRecord(offset int64) (*LogRecord, int64, error) {
 func (df *DataFile) readNBytes(n int64, offset int64) (buf []byte, err error) {
 	buf = make([]byte, n)
 	_, err = df.IoManager.Read(buf, offset)
-	return
+	return buf, err
+}
+
+// 14课时加入，重置IOmanager
+func (df *DataFile) SetIOManager(dirPath string, ioType fio.FileIOType) error {
+	if err := df.IoManager.Close(); err != nil {
+		return err
+	}
+	ioManager, err := fio.NewIOManager(GetDataFileName(dirPath, df.FileId), ioType)
+	if err != nil {
+		return err
+	}
+	df.IoManager = ioManager
+	return nil
 }

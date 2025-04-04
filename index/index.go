@@ -12,9 +12,9 @@ type Indexer interface {
 	//pos就是在文件存储的位置信息
 	//put的语义：将student:1 插入到文件1，偏移量为100的地方
 	//Indexer.Put([]byte("student:1",&data.LogRecordsPos{Fid:1,Offset:100}))
-	Put(key []byte, pos *data.LogRecordPos) bool
+	Put(key []byte, pos *data.LogRecordPos) *data.LogRecordPos
 	Get(key []byte) *data.LogRecordPos
-	Delete(key []byte) bool
+	Delete(key []byte) (*data.LogRecordPos, bool)
 	//迭代器
 	Iterator(reverse bool) Iterator
 	Size() int

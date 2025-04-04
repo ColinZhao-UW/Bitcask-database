@@ -37,6 +37,7 @@ func AvailableDiskSize() (uint64, error) {
 }
 
 // CopyDir 拷贝数据目录
+// 第十六节的内容
 func CopyDir(src, dest string, exclude []string) error {
 	// 目标目标不存在则创建
 	if _, err := os.Stat(dest); os.IsNotExist(err) {

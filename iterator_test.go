@@ -2,6 +2,7 @@ package bitcask_go
 
 import (
 	"bitcask-go/utils"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
@@ -66,10 +67,12 @@ func TestDB_Iterator_Multi_Values(t *testing.T) {
 	// 正向迭代
 	iter1 := db.NewIterator(DefaultIteratorOptions)
 	for iter1.Rewind(); iter1.Valid(); iter1.Next() {
+		fmt.Println(iter1.Value())
 		assert.NotNil(t, iter1.Key())
 	}
 	iter1.Rewind()
 	for iter1.Seek([]byte("c")); iter1.Valid(); iter1.Next() {
+		fmt.Println(iter1.Value())
 		assert.NotNil(t, iter1.Key())
 	}
 	iter1.Close()

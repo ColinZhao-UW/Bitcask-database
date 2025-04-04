@@ -37,10 +37,10 @@ func NewIOManager(fileName string, typ FileIOType) (IOManager, error) {
 		return NewFileIOManager(fileName)
 
 	case MemoryMap:
-		return nil, errors.New("MMAP not supported")
+		return NewMMapIOManager(fileName)
 
 	default:
 		return nil, errors.New("Invalid IO type")
 	}
-	
+
 }
